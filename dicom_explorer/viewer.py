@@ -1,4 +1,4 @@
-"""Interactive slice viewer built on matplotlib widgets."""
+"""Interactive slice viewer built from matplotlib widgets."""
 
 from __future__ import annotations
 
@@ -13,9 +13,7 @@ from .windowing import CT_PRESETS, apply_window, default_window, is_inverted
 def _aspect(series: Series) -> float:
     """Display aspect ratio for an axial slice.
 
-    Pixels are not always square. PixelSpacing is (row_mm, col_mm); if you
-    ignore it, a scan with 0.7 x 0.5 mm pixels renders visibly squashed and
-    any distance you measure off the screen is wrong.
+    Pixel Spacing is (row_mm, col_mm)
     """
     row_mm, col_mm = series.pixel_spacing
     return row_mm / col_mm
@@ -110,8 +108,6 @@ def save_window_comparison(
 ) -> str:
     """Render one slice under several windows, side by side.
 
-    The clearest demonstration that windowing is a display choice and not a
-    property of the data: identical pixels, three very different images.
     """
     index = series.n_slices // 2 if index is None else index
     invert = is_inverted(series.datasets[0])
