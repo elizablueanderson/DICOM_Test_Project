@@ -1,8 +1,5 @@
 """Load a DICOM series from disk and assemble it into a 3D volume.
 
-The hard part of reading DICOM is not reading the files. It is putting the
-slices back in the right order and knowing what the pixel numbers mean.
-Both of those are handled here.
 """
 
 from __future__ import annotations
@@ -47,9 +44,7 @@ class Series:
 def find_series(directory: str | Path) -> dict[str, list[Path]]:
     """Walk a directory and group every readable image file by SeriesInstanceUID.
 
-    One folder often holds several series (e.g. a scout scan plus the real
-    acquisition, or two different reconstruction kernels). Grouping by UID is
-    the only reliable way to separate them; folder names lie.
+    Grouping several scans by UID is the only reliable way to separate them.
     """
     directory = Path(directory)
     series: dict[str, list[Path]] = {}
@@ -76,10 +71,7 @@ def find_series(directory: str | Path) -> dict[str, list[Path]]:
 
 def _slice_normal(ds) -> np.ndarray:
     """Unit vector perpendicular to the image plane.
-
-    ImageOrientationPatient holds six numbers: the direction cosines of the
-    image rows (first three) and the image columns (last three), in patient
-    coordinates. Their cross product points along the stack.
+    
     """
     if "ImageOrientationPatient" not in ds:
         return np.array([0.0, 0.0, 1.0])
@@ -91,9 +83,7 @@ def _sort_key(ds) -> float:
     """Position of a slice along the stacking axis, in mm.
 
     Projecting ImagePositionPatient onto the slice normal gives a single
-    number that increases monotonically through the stack. This works for
-    oblique and angled acquisitions, where InstanceNumber and SliceLocation
-    are unreliable or missing.
+    number that increases monotonically through the stack of images
     """
     if "ImagePositionPatient" in ds:
         ipp = np.array(ds.ImagePositionPatient, dtype=float)
