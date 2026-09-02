@@ -1,7 +1,7 @@
 # DICOM Explorer
 
 Load a CT or MRI series, put the slices back in anatomical order, 
-convert stored pixel values into physical units, view them interactively.
+convert stored pixel values into other units, view them interactively.
 DICOM = file format every clinical scanner writes and every PACS stores. 
 Turning a folder of hundreds of files into ordered and scaled 3D volumes leaves room for mistakes,
 this repository handles it in only around 300 readable lines.
