@@ -1,4 +1,4 @@
-# DICOM Explorer
+# DICOM Test Project
 
 Load a CT or MRI series, put the slices back in anatomical order, 
 convert stored pixel values into other units, view them interactively.
