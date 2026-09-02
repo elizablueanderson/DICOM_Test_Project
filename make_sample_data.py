@@ -1,14 +1,9 @@
-"""Generate a synthetic chest CT series as real DICOM files.
+"""Generate a fake chest CT series as real DICOM files.
 
-Real patient data cannot go in a public repository, and asking someone to
-register for an archive before they can run your code guarantees they never
-run it. So this builds a phantom from scratch and writes it out as valid
-DICOM, which also demonstrates the data model from the writing side: to
-produce a file another tool will accept, you have to get the geometry,
-the pixel representation and the rescale relationship right.
-
-Tissue values are the conventional Hounsfield numbers, so the clinical
-window presets in windowing.py behave the way they do on a real scan.
+Real patient data can't be in a public repo, so this builds a demo and
+writes it out as valid DICOM to produce a file that can be rescaled.
+Tissue values are the conventional Hounsfield numbers, so they show up 
+the same way they do on a real scan.
 
     python make_sample_data.py
 """
@@ -25,8 +20,8 @@ from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
 CT_IMAGE_STORAGE = "1.2.840.10008.5.1.4.1.1.2"
 
-# Hounsfield units. Water is 0 and air is -1000 by definition; the rest are
-# typical values for the tissue.
+# Hounsfield units. Water is 0 and air is -1000, the rest are
+# typical values for tissue.
 HU = {
     "air": -1000.0,
     "lung": -780.0,
@@ -61,7 +56,7 @@ def build_volume(n_slices=48, size=256, seed=0) -> np.ndarray:
         body = _ellipse(sl.shape, c, c, body_ry, body_rx)
         sl[body] = HU["muscle"]
 
-        # Subcutaneous fat: the body minus an inset copy of itself.
+        # Subcutaneous fat: the body minus copy of itself.
         inner = _ellipse(sl.shape, c, c, body_ry - 9, body_rx - 9)
         sl[body & ~inner] = HU["fat"]
 
@@ -77,34 +72,33 @@ def build_volume(n_slices=48, size=256, seed=0) -> np.ndarray:
                 texture = rng.normal(0, 90, sl.shape).astype(np.float32)
                 sl[lung] += texture[lung]
 
-        # Mediastinum: heart and great vessels between the lungs.
+        # Mediastinum: heart and vessels between the lungs.
         heart = _ellipse(sl.shape, c + 0.05 * size, c - 0.02 * size,
                          0.13 * size * lung_scale, 0.11 * size * lung_scale)
         sl[heart] = HU["blood"]
 
-        # Vertebral body: trabecular core inside a cortical shell.
+        # Vertebral body: core inside a cortical shell.
         v_out = _ellipse(sl.shape, c + 0.24 * size, c, 0.055 * size, 0.065 * size)
         v_in = _ellipse(sl.shape, c + 0.24 * size, c, 0.040 * size, 0.050 * size)
         sl[v_out] = HU["cortical_bone"]
         sl[v_in] = HU["trabecular_bone"]
 
-        # Ribs, as bright dots around the body wall.
+        # Ribs = bright dots around the body wall.
         for angle in np.linspace(0.35, np.pi - 0.35, 7):
             for sign in (-1, 1):
                 ry_pos = c - np.cos(angle) * (body_ry - 5)
                 rx_pos = c + sign * np.sin(angle) * (body_rx - 5)
                 sl[_ellipse(sl.shape, ry_pos, rx_pos, 4, 4)] = HU["cortical_bone"]
 
-        # A solid nodule in the right lung, present only on middle slices.
-        # It is invisible in a bone window and obvious in a lung window,
-        # which is the whole point of having both.
+        # A solid nodule in the right lung, present only on middle slice
+        # It is not seen in a bone window and obvious in a lung window
         z_off = (k - n_slices * 0.45) * 2.0
         r_mm = 9.0
         if abs(z_off) < r_mm:
             r_pix = np.sqrt(r_mm**2 - z_off**2) / 0.7
             sl[_ellipse(sl.shape, c - 0.04 * size, c - 0.19 * size, r_pix, r_pix)] = HU["lesion"]
 
-        # Scanner noise, so the image is not artificially clean.
+        # Scanner noise, so the image is not too clean
         vol[k] = sl + rng.normal(0, 12, sl.shape).astype(np.float32)
 
     return vol
@@ -118,10 +112,8 @@ def write_series(volume: np.ndarray, out_dir: Path, spacing=(0.7, 0.7), thicknes
     n, rows, cols = volume.shape
     intercept, slope = -1024.0, 1.0
 
-    # Filenames are scrambled on purpose. Real archives export files named by
-    # UID or by an arbitrary counter, so alphabetical order rarely matches
-    # anatomical order. If your loader sorts by filename it will look fine
-    # and be wrong. loader.py sorts by ImagePositionPatient instead.
+    # Filenames are mixed up on purpose. Alphabetical order rarely matches
+    # anatomical order. loader.py sorts by ImagePositionPatient instead.
     order = list(range(n))
     random.Random(1).shuffle(order)
 
@@ -154,10 +146,10 @@ def write_series(volume: np.ndarray, out_dir: Path, spacing=(0.7, 0.7), thicknes
         ds.Manufacturer = "dicom-explorer"
         ds.ManufacturerModelName = "make_sample_data.py"
 
-        # Geometry. ImageOrientationPatient holds the direction cosines of the
+        # ImageOrientationPatient: holds the cosines of the
         # image rows then the image columns; [1,0,0, 0,1,0] is a plain axial
-        # slice. ImagePositionPatient is the patient-space location of the
-        # centre of the first voxel, and it is what the loader sorts on.
+        # slice. ImagePositionPatient is the location of the
+        # center of the first voxel, and is what the loader sorts on.
         ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
         ds.ImagePositionPatient = [
             -spacing[1] * cols / 2,
@@ -170,8 +162,8 @@ def write_series(volume: np.ndarray, out_dir: Path, spacing=(0.7, 0.7), thicknes
         ds.SliceLocation = round(k * thickness, 3)
         ds.PatientPosition = "HFS"
 
-        # Pixel representation. 16 bits, unsigned, one sample per pixel,
-        # MONOCHROME2 (low value renders dark).
+        # Pixel representation: 16 bits, unsigned, one sample per pixel,
+        # MONOCHROME2 (low value shows dark, not light).
         ds.SamplesPerPixel = 1
         ds.PhotometricInterpretation = "MONOCHROME2"
         ds.Rows, ds.Columns = rows, cols
@@ -180,10 +172,9 @@ def write_series(volume: np.ndarray, out_dir: Path, spacing=(0.7, 0.7), thicknes
         ds.HighBit = 15
         ds.PixelRepresentation = 0
 
-        # The rescale relationship: HU = slope * stored + intercept.
-        # Storing unsigned integers with intercept -1024 is the usual CT
-        # convention, because air at -1000 HU has to fit in a range that
-        # starts at zero.
+        # Rescale relationship: HU = slope * stored + intercept.
+        # Unsigned integers with intercept -1024 = regular CT convention, 
+        # because air at -1000 HU has to fit in a range that starts at zero.
         ds.RescaleSlope = slope
         ds.RescaleIntercept = intercept
         ds.RescaleType = "HU"
