@@ -1,4 +1,4 @@
-"""Tests for the parts that are easy to get silently wrong."""
+"""Tests to ensure correct ordering"""
 
 import numpy as np
 import pytest
