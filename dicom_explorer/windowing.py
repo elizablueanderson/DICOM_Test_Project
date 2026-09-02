@@ -1,28 +1,20 @@
 """Window/level: mapping a wide range of tissue values onto a visible grey scale.
 
 A CT slice spans roughly -1000 HU (air) to +3000 HU (dense bone), about 4000
-distinct values. A monitor shows 256 grey levels and the human eye resolves
-fewer than that. So you cannot display the whole range at once and see
-anything useful.
+distinct values, the human eye can see fewer than 256.
+Windowing solves this by picking an interval and stretching 
+the inside across a grey scale. Description:
 
-Windowing solves this by picking an interval and throwing the rest away.
-Everything below the interval renders black, everything above renders white,
-and the values inside are stretched across the full grey scale. The interval
-is described by its centre (level) and its width:
+    lower = center - width / 2
+    upper = center + width / 2
 
-    lower = centre - width / 2
-    upper = centre + width / 2
 
-This is why radiologists flip between presets on the same image. A lung
-window and a bone window are the same pixels, displayed twice.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-# Centre and width in Hounsfield units. These are the conventional starting
-# points used in clinical practice; radiologists adjust from here.
 CT_PRESETS: dict[str, tuple[float, float]] = {
     "lung":        (-600, 1500),
     "soft tissue": (   40,  400),
@@ -44,18 +36,12 @@ def preset(name: str) -> tuple[float, float]:
 
 
 def default_window(ds, volume: np.ndarray) -> tuple[float, float]:
-    """The window to open with.
-
-    Scanners usually record the window the technologist was using in
-    WindowCenter and WindowWidth. Those tags may hold several values, in which
-    case the first is the primary one. If they are absent (common on MRI,
-    where pixel values have no absolute meaning), fall back to the 1st-99th
-    percentile of the data, which ignores outliers better than min/max.
+    """The window to open wid
     """
     if "WindowCenter" in ds and "WindowWidth" in ds:
-        centre = ds.WindowCenter
+        center = ds.WindowCenter
         width = ds.WindowWidth
-        centre = float(centre[0] if hasattr(centre, "__iter__") else centre)
+        center = float(centre[0] if hasattr(centre, "__iter__") else centre)
         width = float(width[0] if hasattr(width, "__iter__") else width)
         if width > 0:
             return centre, width
@@ -66,16 +52,14 @@ def default_window(ds, volume: np.ndarray) -> tuple[float, float]:
 
 def apply_window(
     image: np.ndarray,
-    centre: float,
+    center: float,
     width: float,
     invert: bool = False,
 ) -> np.ndarray:
     """Map an image to 0..1 for display using the given window.
 
-    invert handles PhotometricInterpretation == MONOCHROME1, where low stored
-    values are meant to be displayed as white rather than black. Getting this
-    backwards produces a photographic negative, which on a chest film looks
-    almost plausible and is easy to miss.
+    invert handles PhotometricInterpretation == MONOCHROME1,
+    low stored values = displayed as white, not black
     """
     lower = centre - width / 2
     upper = centre + width / 2
@@ -85,5 +69,5 @@ def apply_window(
 
 
 def is_inverted(ds) -> bool:
-    """True if this dataset uses MONOCHROME1 (low value = white)."""
+    """True if this data uses MONOCHROME1 (low value = white)."""
     return str(getattr(ds, "PhotometricInterpretation", "MONOCHROME2")) == "MONOCHROME1"
