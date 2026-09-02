@@ -1,8 +1,7 @@
-"""Read the DICOM header: acquisition parameters and identifying information.
+"""Read the DICOM header: acquisition parameters + identifying info. 
 
-A DICOM file is a small database record that happens to contain an image.
-The header carries the scan settings, the geometry, and, in a clinical file,
-the patient's identity.
+DICOM = database record that contains an image.
+The header shows the scan settings, the geometry, and patient's identity (in a clincial file).
 """
 
 from __future__ import annotations
@@ -26,16 +25,6 @@ SUMMARY_TAGS = {
                        "FlipAngle", "ScanningSequence", "SequenceVariant"],
 }
 
-# Tags that carry protected health information. Anything here must be removed
-# before a dataset leaves a clinical environment, and none of it belongs in a
-# public GitHub repository.
-PHI_TAGS = [
-    "PatientName", "PatientID", "PatientBirthDate", "PatientSex", "PatientAge",
-    "PatientAddress", "PatientTelephoneNumbers", "OtherPatientIDs",
-    "ReferringPhysicianName", "PerformingPhysicianName", "OperatorsName",
-    "InstitutionName", "InstitutionAddress", "StationName", "AccessionNumber",
-    "StudyID", "InstanceCreationDate", "AcquisitionDate", "ContentDate",
-]
 
 
 def summarise(ds) -> str:
@@ -55,12 +44,8 @@ def summarise(ds) -> str:
 
 
 def audit_phi(ds) -> list[tuple[str, str]]:
-    """Return every populated identifying field found in the header.
+    """Return every identifying field found in the header.
 
-    Run this before you commit sample data. Note that de-identification is
-    harder than blanking these tags: private vendor tags, burned-in text in
-    the pixels themselves, and reconstructable facial anatomy in head scans
-    all leak identity too. Treat this as a first pass, not a guarantee.
     """
     found = []
     for tag in PHI_TAGS:
